@@ -320,6 +320,9 @@ On Error GoTo errhandler:
     
     End Select
     
+    ' Inicializamos el manejador de inputs.
+    Call Init_InputDevice
+    
     'Seteamos la matriz de proyeccion.
     Call D3DXMatrixOrthoOffCenterLH(Projection, 0, 1024, 768, 0, -1#, 1#)
     Call D3DXMatrixIdentity(IdentityMatrix)
@@ -426,25 +429,19 @@ ErrorHandler:
 End Sub
 
 Public Sub Engine_Deinit()
-    
-    On Error GoTo Engine_Deinit_Err
-    
-    
+ 
     Erase MapData
     Erase charlist
     
+    Call DirectInputDevice.Unacquire
+    
     Set DirectDevice = Nothing
     Set DirectD3D = Nothing
+    Set DirectInputDevice = Nothing
+    Set DirectInput = Nothing
     Set DirectX = Nothing
     Set SpriteBatch = Nothing
 
-    
-    Exit Sub
-
-Engine_Deinit_Err:
-    Call RegistrarError(Err.Number, Err.Description, "engine.Engine_Deinit", Erl)
-    Resume Next
-    
 End Sub
 
 Public Sub Engine_ActFPS()
@@ -1931,23 +1928,23 @@ End Function
 Public Sub Start()
     
     On Error GoTo Start_Err
-    
 
     DoEvents
 
     Do While prgRun
-
+        
+        If Engine_ProcessInput() = -1 Then GoTo EndOfLoop
+        
         Call FlushBuffer
 
         If frmMain.WindowState <> vbMinimized Then
             Select Case QueRender
 
                 Case 0
-                    render
-                
-                    Check_Keys
+                    Call render
+                    Call Check_Keys
                     Moviendose = False
-                    DrawMainInventory
+                    Call DrawMainInventory
 
                     If frmComerciar.Visible Then
                         DrawInterfaceComerciar
@@ -1973,8 +1970,6 @@ Public Sub Start()
                         DrawInventoryUserComercio
                         DrawInventoryOtherComercio
                     End If
-                    
-                    
 
                 Case 1
                     If Not frmConnect.Visible Then
@@ -1995,27 +1990,21 @@ Public Sub Start()
 
             Sound.Sound_Render
         Else
+        
             Sleep 60&
             Call frmMain.Inventario.ReDraw
+            
         End If
+        
         DoEvents
 
-        Rem Limitar FPS
-        '   If LimitarFps Then
-        '   While (GetTickCount - FrameTime) < FramesPerSecCounter
-        '     Sleep 1
-        '  Wend
-        '   While GetTickCount - FrameTime < 55
-        '     Sleep 5
-        '   Wend
-        '  End If
-    Loop '
+EndOfLoop:
+    Loop
 
     EngineRun = False
 
     Call CloseClient
 
-    
     Exit Sub
 
 Start_Err:
