@@ -30,6 +30,18 @@ Begin VB.Form frmConnect
    ScaleWidth      =   1024
    StartUpPosition =   2  'CenterScreen
    Visible         =   0   'False
+   Begin VB.ListBox lstServers 
+      Appearance      =   0  'Flat
+      BackColor       =   &H00000000&
+      ForeColor       =   &H0000FF00&
+      Height          =   4905
+      ItemData        =   "frmConnect.frx":57E2
+      Left            =   1320
+      List            =   "frmConnect.frx":57E4
+      TabIndex        =   2
+      Top             =   3720
+      Width           =   2775
+   End
    Begin InetCtlsObjects.Inet Inet1 
       Left            =   12600
       Top             =   5880
@@ -59,6 +71,14 @@ Begin VB.Form frmConnect
       TabIndex        =   0
       Top             =   0
       Width           =   15360
+      Begin VB.CommandButton btnActualizarLista 
+         Caption         =   "Actualizar Lista"
+         Height          =   855
+         Left            =   1440
+         TabIndex        =   3
+         Top             =   8760
+         Width           =   2415
+      End
       Begin VB.TextBox txtNombre 
          Alignment       =   2  'Center
          Appearance      =   0  'Flat
@@ -115,6 +135,9 @@ Attribute VB_Exposed = False
 Option Explicit
 
 Private Char As Byte
+
+Public QuantityServers As Integer
+Public IpApiEnabled As Boolean
 
 Private Sub Form_Activate()
     
@@ -183,6 +206,26 @@ Form_Load_Err:
 End Sub
 
 
+
+Private Sub lstServers_Click()
+   'Parchesin para poder clickear el primer server apenas entro al juego automaticamente, sino hago esto el ListIndex es -1
+    If lstServers.ListIndex < 0 Then lstServers.ListIndex = 0
+
+    Dim ServerIndexInLstServer As Integer
+    ServerIndexInLstServer = lstServers.ListIndex + 1
+
+    IPTxt.Text = ServersLst(ServerIndexInLstServer).IP
+    PortTxt.Text = ServersLst(ServerIndexInLstServer).puerto
+    
+    'Variable Global declarada en Declares.bas
+    'MundoSeleccionado = ServersLst(ServerIndexInLstServer).Mundo
+    
+    'Call Protocol.Connect(E_MODO.ObtenerDatosServer)
+
+    'pingTime = GetTickCount
+
+    CurServer = ServerIndexInLstServer
+End Sub
 
 Private Sub relampago_Timer()
     
@@ -803,3 +846,104 @@ LogearPersonaje_Err:
     Resume Next
     
 End Sub
+
+Private Function RefreshServerList() As String
+'***************************************************
+'Author: Recox
+'Last Modification: 01/04/2019
+'01/04/2019: Recox - Descarga y llena el listado de servers
+'***************************************************
+        Call DownloadServersFile("https://raw.githubusercontent.com/ao-libre/ao-cliente/master/INIT/sinfo.dat")
+        Call CargarServidores
+End Function
+
+
+Private Sub btnActualizarLista_Click()
+'***************************************************
+'Author: Recox
+'Last Modification: 01/04/2019
+'01/04/2019: Recox - Boton para actualizar la lista de servers
+'***************************************************
+    frmConnect.lstServers.Clear
+    frmConnect.lstServers.AddItem ("Actualizando Servers...")
+    frmConnect.lstServers.AddItem ("Por Favor Espere")
+    Call RefreshServerList
+    MsgBox "Se actualizo con exito la lista de servers"
+End Sub
+
+
+Private Sub DownloadServersFile(myURL As String)
+'**********************************************************
+'Downloads the sinfo.dat file from a given url
+'Last change: 03/04/2020
+'Implemented by Cucsifae
+'Check content of strData to avoid clean the file sinfo.ini if there is no response from Github by Recox
+'If the response from github is error code 500 we don't do anything with the sinfo.dat file Recox
+'**********************************************************
+ On Error GoTo Error
+    Dim strData As String
+    Dim f As Integer
+    Dim Inet As clsInet
+    
+    Set Inet = New clsInet
+
+    strData = Inet.OpenRequest(myURL, "GET")
+    strData = Inet.Execute
+    strData = Inet.GetResponseAsString
+
+    f = FreeFile
+
+    Dim is500Error As Boolean
+    is500Error = InStr(1, strData, "500: Internal Server Error")
+    
+    If LenB(strData) <> 0 And Not is500Error Then
+        Open App.Path & "\..\Recursos\sinfo.dat" For Output As #f
+            Print #f, strData
+        Close #f
+    End If
+
+    Exit Sub
+
+Error:
+    Call MsgBox("Error: " & Err.Description, vbCritical + vbOKOnly, "Argentum Online Libre " & Err.Number)
+    Exit Sub
+End Sub
+
+
+Public Sub CargarServidores()
+'********************************
+'Author: Unknown
+'Last Modification: 21/12/2019
+'Last Modified by: Recox
+'Added Instruction "CloseClient" before End so the mutex is cleared (Rapsodius)
+'Added IP Api to get the country of the IP. (Recox)
+'Get ping from server (Recox)
+'********************************
+On Error Resume Next
+    Dim File As String
+
+    File = App.Path & "\..\Recursos\sinfo.dat"
+    QuantityServers = Val(GetVar(File, "INIT", "Cant"))
+    IpApiEnabled = GetVar(App.Path & "\..\Recursos\sinfo.dat" & "Config.ini", "Parameters", "IpApiEnabled")
+
+    frmConnect.lstServers.Clear
+
+    ReDim ServersLst(1 To QuantityServers) As tServerInfo
+
+    Dim i As Long
+    For i = 1 To QuantityServers
+        Dim CurrentIp As String
+        CurrentIp = Trim$(GetVar(File, "S" & i, "Ip"))
+
+        ServersLst(i).IP = CurrentIp
+        ServersLst(i).puerto = CInt(GetVar(File, "S" & i, "PJ"))
+        'ServersLst(i).Mundo = GetVar(File, "S" & i, "MUNDO")
+        ServersLst(i).desc = GetVar(File, "S" & i, "Desc")
+
+        ' Call PingServer(ServersLst(i).Ip, ServersLst(i).Puerto)
+        frmConnect.lstServers.AddItem (ServersLst(i).desc)
+    Next i
+
+    If CurServer = 0 Then CurServer = 1
+End Sub
+

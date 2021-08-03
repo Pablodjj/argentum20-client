@@ -124,6 +124,7 @@ Module=Protocol_Writes; CODIGO\Protocol_Writes.bas
 Form=CODIGO\frmCrafteo.frm
 Form=CODIGO\frmAOGuard.frm
 Module=modNetwork; CODIGO\modNetwork.bas
+Class=clsInet; CODIGO\clsInet.cls
 ResFile32="AO20.res"
 IconForm="frmMain"
 Startup="Sub Main"
