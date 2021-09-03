@@ -14,6 +14,26 @@ Public ProjectionComposedTexture As D3DMATRIX
 
 Private Declare Sub CopyMemory Lib "kernel32" Alias "RtlMoveMemory" (ByRef destination As Any, ByRef source As Any, ByVal length As Long)
 
+' Used for the DirectX 11 implementation
+Public Sub pvArrayLong(aDest() As Long, ParamArray A() As Variant)
+    Dim lIdx            As Long
+    
+    ReDim aDest(0 To UBound(A)) As Long
+    For lIdx = 0 To UBound(A)
+        aDest(lIdx) = A(lIdx)
+    Next
+End Sub
+
+' Used for the DirectX 11 implementation
+Public Sub pvArraySingle(aDest() As Single, ParamArray A() As Variant)
+    Dim lIdx            As Long
+    
+    ReDim aDest(0 To UBound(A)) As Single
+    For lIdx = 0 To UBound(A)
+        aDest(lIdx) = A(lIdx)
+    Next
+End Sub
+
 Function MakeVector(ByVal x As Single, ByVal y As Single, ByVal z As Single) As D3DVECTOR
     '*****************************************************
     '****** Coded by Menduz (lord.yo.wo@gmail.com) *******
