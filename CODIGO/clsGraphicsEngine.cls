@@ -18,12 +18,20 @@ Private m_d3d11Device           As VBD3D11.ID3D11Device1
 Private m_d3d11DeviceContext    As VBD3D11.ID3D11DeviceContext1
 Private m_d3d11SwapChain        As VBD3D11.IDXGISwapChain1
 Private m_d3d11FrameBufferView  As VBD3D11.ID3D11RenderTargetView
-Private m_Batch                 As clsBatch
+
+Private m_vsBlob                As ID3DBlob
+Private m_vertexShader          As ID3D11VertexShader
+Private m_pixelShader           As ID3D11PixelShader
+Private m_inputLayout           As ID3D11InputLayout
+Private m_vertexBuffer          As ID3D11Buffer
+Private m_numVerts              As Long
+Private m_stride                As Long
+Private m_offset                As Long
 
 ' Engine States
 Private m_isRunning             As Boolean
 
-Public Sub BeginScene(Optional ByVal ColorRGBA As Single = 0)
+Public Sub BeginScene(Optional ByRef DestRect As VB, Optional ByVal ColorRGBA As Single = 0)
     
     On Error GoTo Engine_BeginScene_Err
         
@@ -35,12 +43,17 @@ Public Sub BeginScene(Optional ByVal ColorRGBA As Single = 0)
         .Height = DestRect.Bottom - DestRect.Top
         .MaxDepth = 1
     End With
-    
     Call m_d3d11DeviceContext.RSSetViewports(1, viewport)
         
     Call m_d3d11DeviceContext.OMSetRenderTargets(1, m_d3d11FrameBufferView, Nothing)
-    
-    Call SpriteBatch.Begin
+
+    m_d3d11DeviceContext.IASetPrimitiveTopology D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+    m_d3d11DeviceContext.IASetInputLayout m_inputLayout
+        
+    m_d3d11DeviceContext.VSSetShader m_vertexShader, Nothing, 0
+    m_d3d11DeviceContext.PSSetShader m_pixelShader, Nothing, 0
+        
+    m_d3d11DeviceContext.IASetVertexBuffers 0, 1, m_vertexBuffer, m_stride, m_offset
     
     Exit Sub
 
@@ -60,10 +73,6 @@ ErrorHandler:
 
         
 End Sub
-
-Public Property Get Batch() As clsBatch
-    Set Batch = m_Batch
-End Property
 
 Private Sub Class_Initialize()
         
@@ -140,11 +149,79 @@ RetryCreateDevice:
     Set d3d11FrameBuffer = m_d3d11SwapChain.GetBuffer(0, IIDFromString(szIID_ID3D11Texture2D))
     Set m_d3d11FrameBufferView = m_d3d11Device.CreateRenderTargetView(d3d11FrameBuffer, ByVal 0)
     
-    '-------------- Sprite Batch
-    Set m_Batch = New clsBatch
-    Call m_Batch.Initialize(2000)
+    '-------------- Create Draw Pipeline
+    Call Init_Pipeline
+    
+    '-------------- Create Vertex Buffer
+    Call Init_VertexBuffer
     
     '-------------- Constants
+    
+End Sub
+
+Private Sub Init_Pipeline()
+    
+    '--- Create Vertex Shader
+    Dim shaderCompileErrorsBlob As ID3DBlob
+    Dim errorString     As String
+    hResult = D3DCompileFromFile(App.Path & "\CODIGO\shaders.hlsl", ByVal 0, ByVal 0, "vs_main", "vs_5_0", 0, 0, m_vsBlob, shaderCompileErrorsBlob)
+    If hResult < 0 Then
+        If hResult = LNG_FACILITY_WIN32 Or ERROR_FILE_NOT_FOUND Then
+            errorString = "Could not compile shader; file not found"
+        ElseIf Not shaderCompileErrorsBlob Is Nothing Then
+            errorString = pvToString(shaderCompileErrorsBlob.GetBufferPointer())
+        End If
+        MsgBox errorString, vbCritical, "Shader Compiler Error"
+        Unload Me
+        GoTo QH
+    End If
+    Set m_vertexShader = m_d3d11Device.CreateVertexShader(m_vsBlob.GetBufferPointer(), m_vsBlob.GetBufferSize(), Nothing)
+    
+    '--- Create Pixel Shader
+    Dim psBlob As ID3DBlob
+    hResult = D3DCompileFromFile(PathCombine(App.Path, "shaders.hlsl"), ByVal 0, ByVal 0, "ps_main", "ps_5_0", 0, 0, psBlob, shaderCompileErrorsBlob)
+    If hResult < 0 Then
+        If hResult = LNG_FACILITY_WIN32 Or ERROR_FILE_NOT_FOUND Then
+            errorString = "Could not compile shader; file not found"
+        ElseIf Not shaderCompileErrorsBlob Is Nothing Then
+            errorString = pvToString(shaderCompileErrorsBlob.GetBufferPointer())
+        End If
+        MsgBox errorString, vbCritical, "Shader Compiler Error"
+        Unload Me
+        GoTo QH
+    End If
+    Set m_pixelShader = m_d3d11Device.CreatePixelShader(psBlob.GetBufferPointer(), psBlob.GetBufferSize(), Nothing)
+    Set psBlob = Nothing
+    
+     '--- Create Input Layout
+    Dim inputElementDesc(0 To 1)  As D3D11_INPUT_ELEMENT_DESC
+    Dim nameBuffer(0 To 1) As UcsBuffer
+    pvInitInputElementDesc inputElementDesc(0), nameBuffer(0), "POS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0
+    pvInitInputElementDesc inputElementDesc(1), nameBuffer(1), "COL", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0
+    Set m_inputLayout = m_d3d11Device.CreateInputLayout(inputElementDesc(0), UBound(inputElementDesc) + 1, m_vsBlob.GetBufferPointer(), m_vsBlob.GetBufferSize())
+    
+End Sub
+
+Private Sub Init_VertexBuffer()
+    
+    '--- Create Vertex Buffer
+    Dim vertexData() As Single '--- x, y, r, g, b, a, u, v
+    pvArraySingle vertexData, _
+        0!, 0.5!, 0!, 1!, 0!, _
+        0.5!, -0.5!, 1!, 0!, _
+        -0.5!, -0.5!, 0!, 0!, 1!, 1!
+    m_stride = 6 * 4
+    m_numVerts = (UBound(vertexData) + 1) / 6
+    m_offset = 0
+    Dim vertexBufferDesc As D3D11_BUFFER_DESC
+    With vertexBufferDesc
+        .ByteWidth = (UBound(vertexData) + 1) * 4
+        .Usage = D3D11_USAGE_IMMUTABLE
+        .BindFlags = D3D11_BIND_VERTEX_BUFFER
+    End With
+    Dim vertexSubresourceData As D3D11_SUBRESOURCE_DATA
+    vertexSubresourceData.pSysMem = VarPtr(vertexData(0))
+    Set m_vertexBuffer = m_d3d11Device.CreateBuffer(vertexBufferDesc, vertexSubresourceData)
     
 End Sub
 
