@@ -9,19 +9,6 @@ END
 Attribute VB_Name = "StdPictureEx"
 Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = True
-Attribute VB_PredeclaredId = False
-Attribute VB_Exposed = False
-VERSION 1.0 CLASS
-Begin
-  MultiUse = -1  'True
-  Persistable = 0  'NotPersistable
-  DataBindingBehavior = 0  'vbNone
-  DataSourceBehavior = 0   'vbNone
-  MTSTransactionMode = 0   'NotAnMTSObject
-End
-Attribute VB_Name = "StdPictureEx"
-Attribute VB_GlobalNameSpace = False
-Attribute VB_Creatable = True
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
 '========================================================================================================
@@ -178,7 +165,7 @@ Private Declare Function GdipDisposeImage Lib "GdiPlus.dll" (ByVal Image As Long
 Private Declare Function GdipLoadImageFromStream Lib "GdiPlus.dll" (ByVal Stream As Long, Image As Long) As Long
 Private Declare Function GdipBitmapLockBits Lib "GdiPlus.dll" (ByVal mBitmap As Long, ByRef mRect As RECTI, ByVal mFlags As Long, ByVal mPixelFormat As Long, ByRef mLockedBitmapData As BitmapData) As Long
 Private Declare Function GdipBitmapUnlockBits Lib "GdiPlus.dll" (ByVal mBitmap As Long, ByRef mLockedBitmapData As BitmapData) As Long
-Private Declare Function GdipCreateBitmapFromScan0 Lib "GdiPlus.dll" (ByVal Width As Long, ByVal Height As Long, ByVal stride As Long, ByVal PixelFormat As Long, scan0 As Any, BITMAP As Long) As Long
+Private Declare Function GdipCreateBitmapFromScan0 Lib "GdiPlus.dll" (ByVal Width As Long, ByVal Height As Long, ByVal Stride As Long, ByVal PixelFormat As Long, Scan0 As Any, BITMAP As Long) As Long
 Private Declare Function GdipGetImageBounds Lib "GdiPlus.dll" (ByVal nImage As Long, srcRect As RECTF, srcUnit As Long) As Long
 Private Declare Function GdipGetImagePixelFormat Lib "GdiPlus.dll" (ByVal hImage As Long, PixelFormat As Long) As Long
 Private Declare Function GdipImageSelectActiveFrame Lib "GdiPlus.dll" (ByVal Image As Long, ByRef dimensionID As Any, ByVal FrameIndex As Long) As Long
@@ -226,7 +213,7 @@ End Type
 Private Type BitmapData                 ' GDI+ lock/unlock bits structure
     Width As Long
     Height As Long
-    stride As Long
+    Stride As Long
     PixelFormat As Long
     Scan0Ptr As Long
     ReservedPtr As Long
@@ -327,7 +314,7 @@ Public Function LoadPicture(Optional ImageSource As Variant, _
                             Optional ByVal DesiredIconCx As Long, _
                             Optional ByVal DesiredIconCy As Long, _
                             Optional ByVal KeepOriginalFormat As Boolean = False, _
-                            Optional ByVal RequiredFormat As PictureTypeConstants = vbPicTypeNone) As StdPicture
+                            Optional ByVal RequiredFormat As PictureTypeConstants = vbPicTypeNone) As stdole.StdPicture
                            
 '========================================================================================================
 ' Key notes. Method replicates VB's LoadPicture function and adds more options
@@ -903,8 +890,8 @@ Private Function pvSetPage(Picture As StdPicture, Index As Long) As StdPicture
             .Width = BIH.biWidth: .Height = BIH.biHeight
             rBounds.nHeight = .Height: rBounds.nWidth = .Width
             .PixelFormat = PixelFormat32bppPremultiplied
-            .stride = -.Width * 4&
-            .Scan0Ptr = pvSafePointerAdd(hBits, (.Height - 1&) * -.stride)
+            .Stride = -.Width * 4&
+            .Scan0Ptr = pvSafePointerAdd(hBits, (.Height - 1&) * -.Stride)
         End With
         If GdipBitmapLockBits(hImage, rBounds, ImageLockModeRead Or ImageLockModeUserInputBuf, uBMP.PixelFormat, uBMP) Then
            If GdipBitmapLockBits(hImage, rBounds, ImageLockModeRead Or ImageLockModeUserInputBuf, uBMP.PixelFormat, uBMP) Then uBMP.Scan0Ptr = 0&
@@ -945,8 +932,8 @@ Private Sub pvSetFrame(Picture As StdPicture, Index As Long)
         ' to change the frame, we simply render over the existing GIF frame
         With uBMP
             .Width = goBMP(1): .Height = goBMP(2)
-            .stride = .Width * -4&  ' ensure pixels are extracted bottom-up vs. GDI+ top-down
-            .Scan0Ptr = pvSafePointerAdd(goBMP(5), (.Height - 1&) * -.stride)
+            .Stride = .Width * -4&  ' ensure pixels are extracted bottom-up vs. GDI+ top-down
+            .Scan0Ptr = pvSafePointerAdd(goBMP(5), (.Height - 1&) * -.Stride)
             .PixelFormat = PixelFormat32bppPremultiplied
             rBounds.nHeight = .Height: rBounds.nWidth = .Width
         End With
@@ -1031,11 +1018,11 @@ Private Function pvLoadPicture(SourceData() As Byte, Size As Long, IconColorDept
                                     .Height = Abs(BIH.biHeight)
                                     .Width = BIH.biWidth
                                     .PixelFormat = lFlags
-                                    .stride = -.Width * 4&
-                                    .Scan0Ptr = pvSafePointerAdd(hBits, -.stride * (.Height - 1&))
+                                    .Stride = -.Width * 4&
+                                    .Scan0Ptr = pvSafePointerAdd(hBits, -.Stride * (.Height - 1&))
                                     rBounds.nHeight = .Height: rBounds.nWidth = .Width
                                 End With                        ' create GDI+ bitmap & upload DIB bits
-                                GdipCreateBitmapFromScan0 BIH.biWidth, uBMP.Height, uBMP.stride, uBMP.PixelFormat, ByVal 0&, hImage
+                                GdipCreateBitmapFromScan0 BIH.biWidth, uBMP.Height, uBMP.Stride, uBMP.PixelFormat, ByVal 0&, hImage
                                 If hImage Then
                                     If GdipBitmapLockBits(hImage, rBounds, ImageLockModeUserInputBuf Or ImageLockModeWrite, uBMP.PixelFormat, uBMP) Then
                                         If GdipBitmapLockBits(hImage, rBounds, ImageLockModeUserInputBuf Or ImageLockModeWrite, uBMP.PixelFormat, uBMP) Then uBMP.Scan0Ptr = 0&
@@ -1523,12 +1510,12 @@ Private Function pvLoadhIcon(icData() As Byte, dCx As Long, dCy As Long, _
                     End Select
                     If ICD.idType = 1 Then LB = 0& Else LB = 4&                             ' Cursor has 4 more bytes
                     BIH.biBitCount = (.PixelFormat And &HFF00&) \ &H100
-                    .stride = -pvDWordAlign(BIH.biBitCount, .Width)                         ' color pixel scanwidth
+                    .Stride = -pvDWordAlign(BIH.biBitCount, .Width)                         ' color pixel scanwidth
                     mskScanWidth = pvDWordAlign(1, .Width)                                  ' mask scanwidth
-                    clrPtrBase = 40& + LB: mskPtrBase = -.stride * .Height + clrPtrBase     ' offsets for pixel/mask data
+                    clrPtrBase = 40& + LB: mskPtrBase = -.Stride * .Height + clrPtrBase     ' offsets for pixel/mask data
                     lSize = mskPtrBase + mskScanWidth * .Height                             ' want GDI+ to give us pixels in bottom-up order
                     ReDim pngData(0 To lSize - 1&)                                          ' resize array & set position where
-                    .Scan0Ptr = VarPtr(pngData(mskPtrBase + .stride))                       '   GDI+ will cache the pixel data
+                    .Scan0Ptr = VarPtr(pngData(mskPtrBase + .Stride))                       '   GDI+ will cache the pixel data
                 End With
                 If GdipBitmapLockBits(hHandle, rBounds, ImageLockModeRead Or ImageLockModeUserInputBuf, uBMP.PixelFormat, uBMP) Then
                     If GdipBitmapLockBits(hHandle, rBounds, ImageLockModeRead Or ImageLockModeUserInputBuf, uBMP.PixelFormat, uBMP) Then lSize = 0&
@@ -1546,7 +1533,7 @@ Private Function pvLoadhIcon(icData() As Byte, dCx As Long, dCy As Long, _
                         ' build a true mask. Though not used by Windows, it could be used by whoever
                         ' called this routine. Just a matter of doing it right vs. doing it quick
                         mskPtr = mskPtrBase: clrPtr = clrPtrBase + 3&: xDepth = 0&
-                        mskShift = 128&: xCy = Abs(uBMP.Height): xCx = -uBMP.stride
+                        mskShift = 128&: xCy = Abs(uBMP.Height): xCx = -uBMP.Stride
                         For xCy = 0& To uBMP.Height - 1&
                             For clrPtr = clrPtr To clrPtr + xCx - 4& Step 4&
                                 ' mask bits: 0=opaque, 1=transparent
@@ -2040,7 +2027,7 @@ Private Function pvConvertFromGDIplus(hImage As Long, IStream As IUnknown, ByVal
             .biWidth = uBMP.Width
             .biPlanes = 1: .biSize = 40
             If uBMP.PixelFormat = PixelFormat32bppPremultiplied Then .biBitCount = 32 Else .biBitCount = 24
-            .biSizeImage = Abs(uBMP.stride * .biHeight)
+            .biSizeImage = Abs(uBMP.Stride * .biHeight)
         End With
         hLock = 0&: Call pvIStreamFromPointer(0&, 54& + BIH.biSizeImage, hLock)
         If hLock Then                   ' wrap pixel data in bitmap file & info headers

@@ -13,38 +13,29 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
 
-Const HASH_TABLE_SIZE As Long = 337
-
 Public TextureSampler As ID3D11SamplerState
 
 Private Type SURFACE_ENTRY_DYN
-
     FileName As Integer
     UltimoAcceso As Long
     texture As ID3D11Texture2D
     Size As Long
     texture_width As Integer
     texture_height As Integer
-
 End Type
 
 Private Type HashNode
-
     surfaceCount As Integer
     SurfaceEntry() As SURFACE_ENTRY_DYN
-
 End Type
 
+Const HASH_TABLE_SIZE As Long = 337
 Private TexList(HASH_TABLE_SIZE - 1) As HashNode
 
-Private mD3D                         As D3DX8
-
-Private device                       As Direct3DDevice8
+Private mGraphicsDevice              As VBD3D11.ID3D11Device1
 
 Private mMaxEntries                  As Integer
-
 Private mCantidadGraficos            As Integer
-
 Private mFreeMemoryBytes             As Long
 
 Private Sub Class_Terminate()
@@ -128,32 +119,18 @@ GetTexture_Err:
     
 End Function
 
-Public Function Init(ByRef D3D8 As D3DX8, ByRef d3d_device As Direct3DDevice8, ByVal MaxMemory As Long) As Boolean
+Public Sub Init(ByRef p_GraphicsDevice As VBD3D11.ID3D11Device1, ByVal MaxMemory As Long)
     '**************************************************************
     'Author: Juan Martín Sotuyo Dodero
     'Last Modify Date: 5/04/2005
     '
     '**************************************************************
-    
-    On Error GoTo Init_Err
-    
+
+    Set mGraphicsDevice = p_GraphicsDevice
     mCantidadGraficos = 0
-    
-    'Seteamos el objeto
-    Set mD3D = D3D8
-    Set device = d3d_device
     mFreeMemoryBytes = MaxMemory
-    
-    Init = True
 
-    
-    Exit Function
-
-Init_Err:
-    Call RegistrarError(Err.Number, Err.Description, "clsTexManager.Init", Erl)
-    Resume Next
-    
-End Function
+End Sub
 
 Private Function CrearGrafico(ByVal Archivo As Integer, ByRef texWidth As Long, ByRef textheight As Long) As Direct3DTexture8
 
@@ -163,13 +140,9 @@ Private Function CrearGrafico(ByVal Archivo As Integer, ByRef texWidth As Long, 
     '
     '**************************************************************
     On Error GoTo ErrHandler
-
-    Dim surface_desc As D3DSURFACE_DESC
-    Dim Index        As Integer
-    Dim DirArchico   As String
-    Dim bytArr()     As Byte
     
-    Index = Archivo Mod HASH_TABLE_SIZE
+    Dim Index         As Integer
+    Dim textureHandle As StdPicture, bytArr() As Byte
     
     '--- Create Sampler State
     Dim samplerDesc As D3D11_SAMPLER_DESC
@@ -184,41 +157,9 @@ Private Function CrearGrafico(ByVal Archivo As Integer, ByRef texWidth As Long, 
         .BorderColor(3) = 1!
         .ComparisonFunc = D3D11_COMPARISON_NEVER
     End With
-    Set m_samplerState = m_d3d11Device.CreateSamplerState(samplerDesc)
+    Set TextureSampler = mGraphicsDevice.CreateSamplerState(samplerDesc)
     
-    '--- Load Image
-    Dim texWidth         As Long
-    Dim texHeight        As Long
-    Dim texNumChannels   As Long
-    Dim testTextureBytes() As Byte
-    Dim texBytesPerRow   As Long
-    If Not pvLoadPng(PathCombine(App.Path, "testTexture.png"), texWidth, texHeight, texNumChannels, testTextureBytes) Then
-        MsgBox "Error loading testTexture.png", vbExclamation, "Load Image"
-        Unload Me
-        GoTo QH
-    End If
-    texBytesPerRow = texWidth * texNumChannels
-    
-    '--- Create Texture
-    Dim textureDesc     As D3D11_TEXTURE2D_DESC
-    Dim textureSubresourceData As D3D11_SUBRESOURCE_DATA
-    Dim texture         As ID3D11Texture2D
-    With textureDesc
-        .Width = texWidth
-        .Height = texHeight
-        .MipLevels = 1
-        .ArraySize = 1
-        .Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
-        .SampleDesc.count = 1
-        .Usage = D3D11_USAGE_IMMUTABLE
-        .BindFlags = D3D11_BIND_SHADER_RESOURCE
-    End With
-    With textureSubresourceData
-        .pSysMem = VarPtr(testTextureBytes(0))
-        .SysMemPitch = 4
-    End With
-    Set texture = m_d3d11Device.CreateTexture2D(textureDesc, textureSubresourceData)
-
+    Index = Archivo Mod HASH_TABLE_SIZE
     
     With TexList(Index)
         .surfaceCount = .surfaceCount + 1
@@ -239,14 +180,12 @@ Private Function CrearGrafico(ByVal Archivo As Integer, ByRef texWidth As Long, 
 
                 End If
                 
-                Dim textureFile As StdPicture
-                textureFile = StdPictureEx.LoadPicture(bytArr)
+                textureHandle = StdPictureEx.LoadPicture(bytArr)
                 
-                'Set .texture = mD3D.CreateTextureFromFileInMemoryEx(device, bytArr(0), UBound(bytArr) + 1, D3DX_DEFAULT, D3DX_DEFAULT, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, D3DX_FILTER_NONE, D3DX_FILTER_NONE, &HFF000000, ByVal 0, ByVal 0)
             #Else
-
+                
+                '--- Get image location
                 Dim PathToFile As String
-
                 PathToFile = App.Path & "\..\Recursos\Graficos\" & LTrim(str(Archivo)) & ".png"
         
                 If Not FileExist(PathToFile, vbArchive) Then
@@ -255,13 +194,46 @@ Private Function CrearGrafico(ByVal Archivo As Integer, ByRef texWidth As Long, 
 
                 End If
 
-                'Set .texture = mD3D.CreateTextureFromFileEx(device, PathToFile, D3DX_DEFAULT, D3DX_DEFAULT, 1, 0, D3DFMT_A8R8G8B8, D3DPOOL_MANAGED, D3DX_FILTER_NONE, D3DX_FILTER_NONE, &HFF000000, ByVal 0, ByVal 0)
-            #End If
+                '--- Load Image
+                '----- Source: https://forums.codeguru.com/showthread.php?256617-How-to-convert-an-IPictureDisp-to-byte-array-(and-the-opposite)
+                textureHandle = StdPictureEx.LoadPicture(PathToFile)
                 
-            .texture.GetLevelDesc 0, surface_desc
-            .texture_width = surface_desc.Width
-            .texture_height = surface_desc.Height
-            .Size = surface_desc.Size
+                ' Extract raw data as a Byte Array from the StdPicture object
+                Dim metadata As PropertyBag
+                Set metadata = New PropertyBag
+                Call metadata.WriteProperty("Image", textureHandle)
+                bytArr = metadata.Contents
+  
+            #End If
+            
+            '--- Create Texture
+            Dim textureDesc             As D3D11_TEXTURE2D_DESC
+            Dim textureSubresourceData  As D3D11_SUBRESOURCE_DATA
+            
+            With textureDesc
+                .Width = textureHandle.Width
+                .Height = textureHandle.Height
+                .MipLevels = 1
+                .ArraySize = 1
+                .format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
+                .SampleDesc.count = 1
+                .Usage = D3D11_USAGE_IMMUTABLE
+                .BindFlags = D3D11_BIND_SHADER_RESOURCE
+            End With
+            
+            With textureSubresourceData
+                .pSysMem = VarPtr(bytArr(0))
+                .SysMemPitch = LenB(bytArr)
+            End With
+            
+            Set .texture = mGraphicsDevice.CreateTexture2D(textureDesc, textureSubresourceData)
+            
+            ' Stored in Texlist
+            .texture_width = textureHandle.Width
+            .texture_height = textureHandle.Height
+            .Size = textureSubresourceData.SysMemPitch
+            
+            ' To be returned by the function
             texWidth = .texture_width
             textheight = .texture_height
             
@@ -277,6 +249,25 @@ ErrHandler:
     Debug.Print "ERROR EN GRHLOAD>" & Archivo & ".png"
 
 End Function
+
+Private Function openPng(ByRef data() As Byte, ByRef lBitmap As Long, ByVal filePath As Long)
+    
+    Dim Handle As Integer
+    
+    Handle = FreeFile() ' Get a free file number
+    
+        Open filePath For Binary Access Read As #Handle
+            
+            lBitmap = LOF(Handle)
+            
+            ReDim data(lBitmap - 1) As Byte  ' Create an array just big enough to hold the whole file
+            
+            Get #Handle, , data() ' Read the file into that array
+   
+        Close #Handle
+
+End Function
+
 
 Public Sub Grh_Load(ByVal file_num As Integer)
     
@@ -299,4 +290,3 @@ Grh_Load_Err:
     Resume Next
     
 End Sub
-

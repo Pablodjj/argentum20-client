@@ -20,6 +20,7 @@ Private m_d3d11SwapChain        As VBD3D11.IDXGISwapChain1
 Private m_d3d11FrameBufferView  As VBD3D11.ID3D11RenderTargetView
 
 Private m_SpriteBatch           As clsBatch
+Private m_TextureManager        As clsTexManager
 
 Private m_vsBlob                As VBD3D11.ID3DBlob
 Private m_vertexShader          As VBD3D11.ID3D11VertexShader
@@ -31,7 +32,7 @@ Private m_stride                As Long
 Private m_offset                As Long
 
 Private Type UcsBufferType
-    Data()              As Byte
+    data()              As Byte
 End Type
 
 Private Type UcsConstantsType
@@ -143,7 +144,7 @@ RetryCreateDevice:
     With d3d11SwapChainDesc
         .Width = 0 '--- use window width
         .Height = 0 '--- use window height
-        .Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
+        .format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB
         .SampleDesc.count = 1
         .SampleDesc.Quality = 0
         .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT
@@ -167,7 +168,9 @@ RetryCreateDevice:
     Set m_SpriteBatch = New clsBatch
     Call m_SpriteBatch.Initialize(2000)
     
-    '-------------- Constants
+    '-------------- Initialize Surface Handler
+    Set m_TextureManager = New clsTexManager
+    Call m_TextureManager.Init(m_d3d11Device, 2000)
     
 End Sub
 
