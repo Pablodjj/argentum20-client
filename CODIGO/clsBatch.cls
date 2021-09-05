@@ -13,9 +13,10 @@ Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
 Option Explicit
  
-Private m_VBuffer As Direct3DVertexBuffer8
-Private m_IBuffer As Direct3DIndexBuffer8
-Private m_Texture As Direct3DTexture8
+Private m_VBuffer As ID3D11Buffer
+Private m_IBuffer As ID3D11Buffer
+Private m_Texture As ID3D11Texture2D
+
 Private m_Alpha   As Boolean
 
 '
@@ -143,24 +144,24 @@ SetAlpha_Err:
     
 End Sub
  
-Public Sub SetTexture(ByRef Texture As Direct3DTexture8)
+Public Sub SetTexture(ByRef texture As Direct3DTexture8)
     
     On Error GoTo SetTexture_Err
     
  
-    If ObjPtr(m_Texture) <> ObjPtr(Texture) Then 'te cabe vb6
+    If ObjPtr(m_Texture) <> ObjPtr(texture) Then 'te cabe vb6
         
         '
         ' Flush the batch since we're using a diferent texture
         '
         Call Flush
        
-        Set m_Texture = Texture
+        Set m_Texture = texture
        
         '
         ' Update the new texture of the batch
         '
-        Call DirectDevice.SetTexture(0, Texture)
+        Call DirectDevice.SetTexture(0, texture)
  
     End If
  
@@ -310,15 +311,15 @@ Friend Sub DrawShadow(ByVal x As Long, _
                 
     Dim Color(3) As RGBA
 
-    Dim i As Integer
-    For i = 0 To 3
-        Color(i).A = (0.2126 * ColorLight(i).r + 0.7152 * ColorLight(i).G + 0.0722 * ColorLight(i).B) ^ 2 * 0.000625
+    Dim I As Integer
+    For I = 0 To 3
+        Color(I).a = (0.2126 * ColorLight(I).r + 0.7152 * ColorLight(I).G + 0.0722 * ColorLight(I).B) ^ 2 * 0.000625
     Next
 
     Dim dX As Single, dy As Single
 
-    For i = 0 To 3
-        Select Case i
+    For I = 0 To 3
+        Select Case I
             Case 0: dX = x: dy = y - 1
             Case 1: dX = x + 1: dy = y
             Case 2: dX = x: dy = y + 1
@@ -390,12 +391,12 @@ Friend Sub DrawReflection(ByVal x As Long, _
 
     Dim Color(3) As RGBA
 
-    Dim i As Integer
-    For i = 0 To 3
-        Color(i).A = ColorLight(i).A * 0.5
-        Color(i).r = ColorLight(i).r * 0.2
-        Color(i).G = ColorLight(i).G * 0.5
-        Color(i).B = ColorLight(i).B
+    Dim I As Integer
+    For I = 0 To 3
+        Color(I).a = ColorLight(I).a * 0.5
+        Color(I).r = ColorLight(I).r * 0.2
+        Color(I).G = ColorLight(I).G * 0.5
+        Color(I).B = ColorLight(I).B
     Next
     
     Dim dt As Single, dX As Long, dy As Long
@@ -673,10 +674,10 @@ Friend Sub DrawVertices(vertices() As TYPE_VERTEX)
     On Error GoTo DrawVertices_Err
     
 
-    Dim i As Long
+    Dim I As Long
 
-    For i = LBound(vertices) To UBound(vertices)
-        m_Data(m_Position) = vertices(i)
+    For I = LBound(vertices) To UBound(vertices)
+        m_Data(m_Position) = vertices(I)
         m_Position = m_Position + 1
 
         If m_Position >= UBound(m_Data) Then
@@ -755,28 +756,51 @@ Public Sub Initialize(ByVal Capacity As Long)
     '
     '  Create the vertice buffer
     '
-    Set m_VBuffer = DirectDevice.CreateVertexBuffer(24 * Capacity, D3DUSAGE_DYNAMIC, D3DFVF_XYZ Or D3DFVF_DIFFUSE Or D3DFVF_TEX1, D3DPOOL_DEFAULT)
- 
+    Dim vertexBufferDesc As D3D11_BUFFER_DESC
+    With vertexBufferDesc
+        .ByteWidth = 24 * Capacity
+        .Usage = D3D11_USAGE_DYNAMIC
+        .BindFlags = D3D11_BIND_VERTEX_BUFFER
+    End With
+    
+    Dim vertexSubresourceData As D3D11_SUBRESOURCE_DATA
+    vertexSubresourceData.pSysMem = VarPtr(vertexData(0))
+    
+    Set m_VBuffer = m_d3d11Device.CreateBuffer(vertexBufferDesc, vertexSubresourceData)
+    
+    
     '
     '  Create the indice buffer, fill it with pre-baked indices
     '
-    Set m_IBuffer = DirectDevice.CreateIndexBuffer(3 * Capacity, D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT)
-   
+    Dim indexBufferDesc  As D3D11_BUFFER_DESC
+    With indexBufferDesc
+        .ByteWidth = 3 * Capacity
+        .Usage = D3D11_USAGE_IMMUTABLE
+        .BindFlags = D3D11_BIND_INDEX_BUFFER
+    End With
+    
+    Dim indexSubresourceData As D3D11_SUBRESOURCE_DATA
+    indexSubresourceData.pSysMem = VarPtr(indices(0))
+    
+    Set m_IBuffer = m_d3d11Device.CreateBuffer(indexBufferDesc, indexSubresourceData)
+    
+    '
+    '  Constant Indexes
+    '
     Dim lpIndices() As Integer
-   
     ReDim lpIndices(Capacity * 3 / 2 - 1) As Integer
    
-    Dim i As Long, j As Integer
+    Dim I As Long, J As Integer
    
-    For i = 0 To UBound(lpIndices) Step 6
-        lpIndices(i) = j
-        lpIndices(i + 1) = j + 1
-        lpIndices(i + 2) = j + 2
-        lpIndices(i + 3) = j + 2
-        lpIndices(i + 4) = j + 3
-        lpIndices(i + 5) = j + 1
+    For I = 0 To UBound(lpIndices) Step 6
+        lpIndices(I) = J
+        lpIndices(I + 1) = J + 1
+        lpIndices(I + 2) = J + 2
+        lpIndices(I + 3) = J + 2
+        lpIndices(I + 4) = J + 3
+        lpIndices(I + 5) = J + 1
        
-        j = j + 4
+        J = J + 4
     Next
    
     Call D3DIndexBuffer8SetData(m_IBuffer, 0, 3 * Capacity, 0, lpIndices(0))
