@@ -18,7 +18,7 @@ Public TextureSampler As ID3D11SamplerState
 Private Type SURFACE_ENTRY_DYN
     FileName As Integer
     UltimoAcceso As Long
-    texture As ID3D11Texture2D
+    texture As VBD3D11.ID3D11Texture2D
     Size As Long
     texture_width As Integer
     texture_height As Integer
@@ -77,7 +77,7 @@ Class_Terminate_Err:
     
 End Sub
 
-Public Function GetTexture(ByVal FileName As Integer, ByRef textwidth As Long, ByRef textheight As Long) As Direct3DTexture8
+Public Function GetTexture(ByVal FileName As Integer, ByRef textwidth As Long, ByRef textheight As Long) As VBD3D11.ID3D11Texture2D
     
     On Error GoTo GetTexture_Err
     
@@ -249,25 +249,6 @@ ErrHandler:
     Debug.Print "ERROR EN GRHLOAD>" & Archivo & ".png"
 
 End Function
-
-Private Function openPng(ByRef data() As Byte, ByRef lBitmap As Long, ByVal filePath As Long)
-    
-    Dim Handle As Integer
-    
-    Handle = FreeFile() ' Get a free file number
-    
-        Open filePath For Binary Access Read As #Handle
-            
-            lBitmap = LOF(Handle)
-            
-            ReDim data(lBitmap - 1) As Byte  ' Create an array just big enough to hold the whole file
-            
-            Get #Handle, , data() ' Read the file into that array
-   
-        Close #Handle
-
-End Function
-
 
 Public Sub Grh_Load(ByVal file_num As Integer)
     
